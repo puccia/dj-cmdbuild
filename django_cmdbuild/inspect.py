@@ -151,17 +151,15 @@ class ModelStore(object):
             if b == 'Class':
                 yield 'from django_cmdbuild.models.helpers import ClassFieldsManager, ClassFields'
             elif b == 'Activity':
-                yield 'class ActivityFields:'
-                yield "       flowstatus = models.IntegerField(db_column='FlowStatus')"
-                yield "       priority = models.IntegerField(db_column='Priority')"
-                yield "       activitydefinitionid = models.CharField(max_length=200, db_column='ActivityDefinitionId')"
-                yield "       processcode = models.CharField(max_length=200, db_column='ProcessCode')"
-                yield "       isquickaccept = models.BooleanField(db_column='IsQuickAccept')"
-                yield "       activitydescription = models.TextField(db_column='ActivityDescription')"
+                yield 'from django_cmdbuild.models.helpers import ActivityFields'
             elif b == 'LookUp':
                 yield "from django_cmdbuild.models.helpers import LookUpManager"
+            elif b == 'CMDBManyToManyField':
+                yield "from django_cmdbuild.models.related import %s" % b
+            elif b == 'ExpanderField':
+                yield "from django_cmdbuild.models.expander import %s" % b
             else:
-                yield "from django_cmdbuild.models import %s" % b
+                yield "from django_cmdbuild.models.helpers import %s" % b
         for m in l:
             yield m
 
