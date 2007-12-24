@@ -13,6 +13,7 @@ class CMDBModelOptions(object):
             pk_set = pk_val is not None and smart_unicode(pk_val) != u''
             if not pk_set:
                 from django.db import connection
+                from introspection_common import query_class_catalog
                 cursor = connection.cursor()
                 sql = 'SELECT ' + query_class_catalog(self._meta.db_table, self._meta.pk.db_column)['default_value']
                 cursor.execute(sql)
@@ -49,6 +50,12 @@ class ClassFields:
     user = models.CharField(max_length=20, db_column='User', blank=True, null=True)
     begindate = models.DateTimeField(db_column='BeginDate', auto_now=True)
     objects = ClassFieldsManager()
-    def __unicode__(self):
-        return self.description
-            
+
+class ActivityFields:
+    flowstatus = models.IntegerField(db_column='FlowStatus')
+    priority = models.IntegerField(db_column='Priority')
+    activitydefinitionid = models.CharField(max_length=200, db_column='ActivityDefinitionId')
+    processcode = models.CharField(max_length=200, db_column='ProcessCode')
+    isquickaccept = models.BooleanField(db_column='IsQuickAccept')
+    activitydescription = models.TextField(db_column='ActivityDescription')
+
