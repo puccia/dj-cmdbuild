@@ -225,7 +225,13 @@ class Command(NoArgsCommand):
         store = ModelStore()
         
         for table_name in introspection_module.get_table_list(cursor):
+            # Internal "service" views
             if table_name.startswith('cmdb') and table_name.endswith('catalog'):
+                continue
+            if table_name in ('relationhistorylist', 'relationlist'):
+                continue 
+            # History views are handled separately
+            if table_name.endswith('_history'):
                 continue
             mc = store.model(table_name)
             # Special CMDBuild cases
@@ -317,7 +323,11 @@ class Command(NoArgsCommand):
                     
                 f.set_column(row[0])
                 # extra_params['db_column'] = '%r' % column_name
-
+                # Special treatment for idclass
+                if f.name == 'idclass':
+                    f.name = '_' + f.name
+                    f.add_kw_param('editable', False)
+                    f.add_kw_param('default', '"%s"' % table_name)
                 if i in relations:
                     #mc.add_edge(relations[i][1])
                     store.model(relations[i][1]).add_edge(mc.name)
@@ -359,7 +369,8 @@ class Command(NoArgsCommand):
                         if cat_entry['desc']:
                             f.add_kw_param('help_text', cat_entry['desc'])
                             #extra_params['help_text'] = '%r' % cat_entry['desc']
-                        if len(cat_entry['lookup']) > 0:
+                        if ( len(cat_entry['lookup']) > 0 
+                            and (not table_name == 'Lookup')):
                             #extra_params['choices'] = 'Lookup.objects.choices(%r)' % cat_entry['lookup']
                             f.add_kw_param('choices', 'Lookup.objects.choices(%r)' % cat_entry['lookup'],
                                 representation=False)
