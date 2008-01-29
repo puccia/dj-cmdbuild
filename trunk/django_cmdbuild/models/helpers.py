@@ -69,10 +69,7 @@ class QSManager(models.Manager):
     def get_query_set(self):
         return self.queryset_class(self.model)
     def __getattr__(self, attr, *args):
-        print self.__dict__['queryset_class']
-
         try:
-            print '%s in dict: %s' % (attr, attr in self.__dict__)
             return self.__dict__[attr]
             #return getattr(self.__class__, attr, *args)
         except KeyError:
@@ -114,6 +111,15 @@ class DescriptionField(models.CharField):
             return getattr(self, name)
         setattr(cls, '_description', property(read_description))
         super(DescriptionField, self).contribute_to_class(cls, name)
+
+class IdClassField(models.TextField):
+	opts = {'db_column': 'IdClass', 'editable': False}
+	def __init__(self):
+		pass
+	def contribute_to_class(self, cls, name):
+		opts = self.opts.copy()
+		opts['default'] = '"%s"' % cls._meta.db_table
+		super(IdClassField, self).__init__(opts)
 
 class ClassFields:
     id = models.AutoField(primary_key=True, db_column='Id')
