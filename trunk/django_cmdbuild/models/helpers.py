@@ -62,33 +62,35 @@ class CMDBModelOptions(object):
         return instance._enddate
     end_date = property(fget=_get_end_date)
 
-class QSManager(models.Manager):
-    def __init__(self, qs_class):
-        super(QSManager, self).__init__()
-        self.queryset_class = qs_class
-    def get_query_set(self):
-        return self.queryset_class(self.model)
-    def __getattr__(self, attr, *args):
-        try:
-            return self.__dict__[attr]
-            #return getattr(self.__class__, attr, *args)
-        except KeyError:
-            return getattr(self.get_query_set(), attr, *args)
-     
+def QSManager(the_queryset_class):
+    class QSManagerType(models.Manager):
+        queryset_class = the_queryset_class
+        def __init__(self, active_only=True):
+            super(QSManagerType, self).__init__()
+            self.active_only = active_only
+        def get_query_set(self):
+            qs = self.__class__.queryset_class(self.model)
+            if self.active_only:
+                qs = qs.active()
+            return qs
+        def all(self):
+            return self.get_query_set()
+        def __getattr__(self, attr, *args):
+            try:
+                return super(QSManagerType, self).__getattr__(attr, *args)
+            except AttributeError:
+                if 'model' in self.__dict__:
+                    return getattr(self.__class__.get_query_set(self), attr, *args)
+                else:
+                    raise 
+    QSManagerType.__name__ = the_queryset_class.__name__ + 'Manager'
+    return QSManagerType
+
 class ClassFieldsQuerySet(models.query.QuerySet):
     def active(self):
         return self.filter(status__exact='A')
 
-    #def get_query_set(self):
-    #   return self.active
-        
-    #def all(self):
-    #   print 'all called'
-    #   return super(ClassFieldsManager, self).all()
-
-class LookUpManager(QSManager):
-    def __init__(self, arg=ClassFieldsQuerySet):
-        super(LookUpManager, self).__init__(arg)
+class LookUpManager(QSManager(ClassFieldsQuerySet)):
     def choices(self, lookup):
         c = self.active().filter(type__exact=lookup).values('id', 'description')
         return [(c['id'], c['description']) for c in c]
@@ -113,13 +115,14 @@ class DescriptionField(models.CharField):
         super(DescriptionField, self).contribute_to_class(cls, name)
 
 class IdClassField(models.TextField):
-	opts = {'db_column': 'IdClass', 'editable': False}
-	def __init__(self):
-		pass
-	def contribute_to_class(self, cls, name):
-		opts = self.opts.copy()
-		opts['default'] = '"%s"' % cls._meta.db_table
-		super(IdClassField, self).__init__(opts)
+    def __init__(self):
+        pass
+    opts = {'db_column': 'IdClass', 'editable': False}
+    def contribute_to_class(self, cls, name):
+        opts = self.opts.copy()
+        opts['default'] = '"%s"' % cls._meta.db_table
+        super(IdClassField, self).__init__(**opts)
+        super(IdClassField, self).contribute_to_class(cls, name)
 
 class ClassFields:
     id = models.AutoField(primary_key=True, db_column='Id')
@@ -129,7 +132,7 @@ class ClassFields:
         choices=(('A', _('Active')), ('U', _('Inactive'))))
     user = models.CharField(max_length=20, db_column='User', blank=True, null=True)
     begin_date = models.DateTimeField(db_column='BeginDate', auto_now=True)
-    objects = QSManager(ClassFieldsQuerySet)
+    objects = QSManager(ClassFieldsQuerySet)()
         
 
 
