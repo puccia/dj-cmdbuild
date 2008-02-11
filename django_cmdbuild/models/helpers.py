@@ -102,12 +102,16 @@ class CodeField(models.CharField):
         kwargs.setdefault('blank', True)
         kwargs.setdefault('null', True)
         super(CodeField, self).__init__(*args, **kwargs)
+    def get_internal_type(self):
+        return "CharField"
 
 class DescriptionField(models.CharField):
     def __init__(self, *args, **kwargs):
         kwargs.setdefault('max_length', 250)
         kwargs.setdefault('db_column', 'Description')
         super(DescriptionField, self).__init__(*args, **kwargs)
+    def get_internal_type(self):
+        return "CharField"
     def contribute_to_class(self, cls, name):
         def read_description(self):
             return getattr(self, name)
@@ -123,6 +127,8 @@ class IdClassField(models.TextField):
         opts['default'] = '"%s"' % cls._meta.db_table
         super(IdClassField, self).__init__(**opts)
         super(IdClassField, self).contribute_to_class(cls, name)
+    def get_internal_type(self):
+        return "TextField"
 
 class ClassFields:
     id = models.AutoField(primary_key=True, db_column='Id')
