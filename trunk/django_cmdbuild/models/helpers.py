@@ -3,6 +3,8 @@ from django.utils.translation import ugettext_lazy as _
 
 from expander import ExpanderField
 
+from querysets import *
+
 class MapFields:
     pass
 
@@ -25,7 +27,11 @@ class CMDBModelOptions(object):
         models.Model.save(self, *args, **kwargs)
 
     def __unicode__(self):
-        return self._description
+        if self._description:
+            return self._description
+        else:
+            return unicode(self.pk)
+   
 
     def _get_status_and_date(self):
         if self.status == 'A':
@@ -62,38 +68,11 @@ class CMDBModelOptions(object):
         return instance._enddate
     end_date = property(fget=_get_end_date)
 
-def QSManager(the_queryset_class):
-    class QSManagerType(models.Manager):
-        queryset_class = the_queryset_class
-        def __init__(self, active_only=True):
-            super(QSManagerType, self).__init__()
-            self.active_only = active_only
-        def get_query_set(self):
-            qs = self.__class__.queryset_class(self.model)
-            if self.active_only:
-                qs = qs.active()
-            return qs
-        def all(self):
-            return self.get_query_set()
-        def __getattr__(self, attr, *args):
-            try:
-                return super(QSManagerType, self).__getattr__(attr, *args)
-            except AttributeError:
-                if 'model' in self.__dict__:
-                    return getattr(self.__class__.get_query_set(self), attr, *args)
-                else:
-                    raise 
-    QSManagerType.__name__ = the_queryset_class.__name__ + 'Manager'
-    return QSManagerType
-
-class ClassFieldsQuerySet(models.query.QuerySet):
-    def active(self):
-        return self.filter(status__exact='A')
-
-class LookUpManager(QSManager(ClassFieldsQuerySet)):
-    def choices(self, lookup):
-        c = self.active().filter(type__exact=lookup).values('id', 'description')
-        return [(c['id'], c['description']) for c in c]
+class CMDBActivityOptions(CMDBModelOptions):
+    class ReadOnly(Exception):
+        pass
+    def save(self):
+        raise self.ReadOnly, 'Cannot save an Activity class'
 
 class CodeField(models.CharField):
     def __init__(self, *args, **kwargs):
@@ -132,6 +111,7 @@ class IdClassField(models.TextField):
 
 class ClassFields:
     id = models.AutoField(primary_key=True, db_column='Id')
+    idclass = IdClassField()
     #code = models.CharField(max_length=100, db_column='Code', blank=True, null=True)
     #description = models.CharField(max_length=250, db_column='Description')
     status = models.CharField(max_length=1, db_column='Status', editable=False,
@@ -139,14 +119,23 @@ class ClassFields:
     user = models.CharField(max_length=20, db_column='User', blank=True, null=True)
     begin_date = models.DateTimeField(db_column='BeginDate', auto_now=True)
     objects = QSManager(ClassFieldsQuerySet)()
-        
+	    
 
+class ActivityFieldsQuerySet(ClassFieldsQuerySet):
+	def filter_by_flowstatus(self, tag):
+		from django_cmdbuild.models import Lookup
+		l = Lookup.objects.get(type='FlowStatus', description=tag)
+		return self.filter(flowstatus=l.id)
+	def completed(self):
+		return self.filter_by_flowstatus('Completato')
 
-class ActivityFields:
-    flowstatus = models.IntegerField(db_column='FlowStatus')
-    priority = models.IntegerField(db_column='Priority')
+class ActivityFields(ClassFields):
+    from django_cmdbuild.models import Lookup
+    flowstatus = models.(db_column='FlowStatus',
+        choices=Lookup.objects.choices(u'FlowStatus'))
+    priority = models.IntegerField(db_column='Priority', null=True, blank=True)
     activitydefinitionid = models.CharField(max_length=200, db_column='ActivityDefinitionId')
     processcode = models.CharField(max_length=200, db_column='ProcessCode')
     isquickaccept = models.BooleanField(db_column='IsQuickAccept')
-    activitydescription = models.TextField(db_column='ActivityDescription')
-
+    activitydescription = models.TextField(db_column='ActivityDescription', blank=True)
+    objects = QSManager(ActivityFieldsQuerySet)()
