@@ -73,6 +73,21 @@ class CMDBActivityOptions(CMDBModelOptions):
         pass
     def save(self):
         raise self.ReadOnly, 'Cannot save an Activity class'
+    def _get_history(self):
+        """
+        Return a QuerySet with all cards belonging to this flow instance.
+        """
+        return self.__class__.objects.with_inactive().filter(
+            process_code=self.process_code).order_by('begin_date')
+    history = property(_get_history)
+
+    def _get_flow_begin_date(self):
+        """
+        Return this flow's begin date.
+        """
+        return self.history[0].begin_date
+    flow_begin_date = property(_get_flow_begin_date)
+
 
 class CodeField(models.CharField):
     def __init__(self, *args, **kwargs):
@@ -122,24 +137,24 @@ class ClassFields:
         
 
 class ActivityFieldsQuerySet(ClassFieldsQuerySet):
-    def _filter_by_flowstatus(self, tag):
+    def _filter_by_flow_status(self, tag):
         from django_cmdbuild.models import Lookup
         l = Lookup.objects.get(type='FlowStatus', description=tag)
-        return self.filter(flowstatus=l.id)
+        return self.filter(flow_status=l.id)
     def completed(self):
-        return self._filter_by_flowstatus('Completato')
+        return self._filter_by_flow_status('Completato')
     def started(self):
-        return self._filter_by_flowstatus('Avviato')
+        return self._filter_by_flow_status('Avviato')
     def stopped(self):
-        return self._filter_by_flowstatus('Interrotto')
+        return self._filter_by_flow_status('Interrotto')
 
 class ActivityFields(ClassFields):
     from django_cmdbuild.models import Lookup
-    flowstatus = models.IntegerField(db_column='FlowStatus',
+    flow_status = models.IntegerField(db_column='FlowStatus',
         choices=Lookup.objects.choices(u'FlowStatus'))
     priority = models.IntegerField(db_column='Priority', null=True, blank=True)
-    activitydefinitionid = models.CharField(max_length=200, db_column='ActivityDefinitionId')
-    processcode = models.CharField(max_length=200, db_column='ProcessCode')
-    isquickaccept = models.BooleanField(db_column='IsQuickAccept')
-    activitydescription = models.TextField(db_column='ActivityDescription', blank=True)
+    activity_definition = models.CharField(max_length=200, db_column='ActivityDefinitionId')
+    process_code = models.CharField(max_length=200, db_column='ProcessCode')
+    quick_accept = models.BooleanField(db_column='IsQuickAccept')
+    activity_description = models.TextField(db_column='ActivityDescription', blank=True)
     objects = QSManager(ActivityFieldsQuerySet)()
