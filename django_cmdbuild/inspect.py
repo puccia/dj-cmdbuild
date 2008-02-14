@@ -31,7 +31,7 @@ class Field(object):
         if hasattr(self, 'db_column'):
             self.add_kw_param('db_column', self.db_column)
         params = self.params + ['%s=%s' % (k, v) for k, v in self.kw_params.items()] 
-        l = '      %s = %s(%s)' % (self.name, self.klass, ', '.join(params))
+        l = '    %s = %s(%s)' % (self.name, self.klass, ', '.join(params))
         if self.comments:
             l += ' # ' + ' '.join(self.comments)
         yield l
@@ -94,9 +94,9 @@ class ModelClass(Vertex):
                 yield l
         yield '      class Admin:'
         if 'ClassFields' in self.base_classes:
-	        yield "          list_display = ('description', 'code', 'status')"
+            yield "          list_display = ('description', 'code', 'status')"
         else:
-		    yield "          pass"
+            yield "          pass"
         for l in self.lines:
             yield l
         raise StopIteration
@@ -185,16 +185,24 @@ class Command(NoArgsCommand):
             yield ''
             self.classfields_are_out = True
 
+    def __init__(self, *args, **kwargs):
+        super(Command, self).__init__(*args, **kwargs)
+        self._dom_cache = None
+
     def query_dom_catalog(self, name):
-        from django.db import connection
-        cursor = connection.cursor()
-        cursor.execute('SELECT domainname, domainclass1, domainclass2, domaincardinality '
-            'FROM cmdbdomaincatalog WHERE domainname = \'%s\'' % name)
+        if self._dom_cache is None:
+            self._dom_cache = {}
+            from django.db import connection
+            cursor = connection.cursor()
+            cursor.execute('SELECT domainname, domainclass1, domainclass2, domaincardinality '
+                'FROM cmdbdomaincatalog')
+            for row in cursor.fetchall():
+                self._dom_cache[row[0]] = {'name': row[0], 'class1': row[1],
+                    'class2': row[2], 'cardinality': row[3]}
         try:
-            r = cursor.fetchall()[0]
+            return self._dom_cache[name]
         except IndexError:
             raise KeyError('No catalog entry for table %s' % name)
-        return {'name': r[0], 'class1': r[1], 'class2': r[2], 'cardinality': r[3]}
     
     def handle_inspection(self):
         from django.db import connection, get_introspection_module
@@ -249,20 +257,27 @@ class Command(NoArgsCommand):
                 bools= map(lambda x: x in big, small)
                 excluder = filter(lambda y: y != True, bools)
                 return len(excluder) == 0
-            class_relations = ('id', 'code', 'description', 'status', 'user', 'begindate')
+
+            activity_relations = ('flowstatus', 'priority',
+                'activitydefinitionid', 'processcode', 'isquickaccept',
+                'activitydescription')
+            class_relations = ('id', 'code', 'description', 'status',
+                'user', 'begindate', 'idclass')
+            
             if subset(class_relations, names):
                 skip_rows.extend(class_relations)
-                mc.add_base_class('ClassFields')
-                mc.extra('commonfields = ExpanderField(ClassFields)')
-                store.with_classfields()
+                if subset(activity_relations, names):
+                    skip_rows.extend(activity_relations)
+                    mc.add_base_class('ActivityFields')
+                    mc.add_base_class('CMDBActivityOptions')
+                    mc.extra('activityfields = ExpanderField(ActivityFields)')
+                    store.with_activityfields()
+                else:
+                    mc.add_base_class('ClassFields')
+                    mc.add_base_class('CMDBModelOptions')
+                    mc.extra('commonfields = ExpanderField(ClassFields)')
+                    store.with_classfields()
                 
-            activity_relations = ('flowstatus', 'priority', 'activitydefinitionid', 'processcode',
-                'isquickaccept', 'activitydescription')
-            if subset(activity_relations, names):
-                skip_rows.extend(activity_relations)
-                mc.add_base_class('ActivityFields')
-                mc.extra('activityfields = ExpanderField(ActivityFields)')
-                store.with_activityfields()
 
             map_relations = ('iddomain', 'idclass1', 'idclass2', 'status',
                 'user', 'begindate', 'enddate')
@@ -324,16 +339,20 @@ class Command(NoArgsCommand):
                 f.set_column(row[0])
                 # extra_params['db_column'] = '%r' % column_name
                 # Special treatment for idclass
-                if f.name == 'idclass':
-                    f.name = '_' + f.name
-                    f.add_kw_param('editable', False)
-                    f.add_kw_param('default', '"%s"' % table_name)
-                if i in relations:
+                #if f.name == 'idclass':
+                #    f.name = '_' + f.name
+                #    f.add_kw_param('editable', False)
+                #    f.add_kw_param('default', '"%s"' % table_name)
+                if f.name == 'code':
+                    f.set_class('CodeField')
+                elif f.name == 'description':
+                    f.set_class('DescriptionField')
+                elif i in relations:
                     #mc.add_edge(relations[i][1])
                     store.model(relations[i][1]).add_edge(mc.name)
                     rel_to = relations[i][1] == table_name and "'self'" or table2model(relations[i][1])
                     #field_type = 'ForeignKey(%s' % rel_to
-                    f.set_class('ForeignKey')
+                    f.set_class('models.ForeignKey')
                     f.add_param(rel_to, representation=False)
                     if f.name.endswith('_id'):
                         f.name = f.name[:-3]
@@ -343,7 +362,7 @@ class Command(NoArgsCommand):
                     except KeyError:
                         field_type = 'TextField'
                         f.add_comment('This field type is a guess.')
-                    f.set_class(field_type)
+                    f.set_class('models.' + field_type)
 
 
                     # This is a hook for DATA_TYPES_REVERSE to return a tuple of
