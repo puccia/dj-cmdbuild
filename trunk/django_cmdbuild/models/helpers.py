@@ -119,19 +119,23 @@ class ClassFields:
     user = models.CharField(max_length=20, db_column='User', blank=True, null=True)
     begin_date = models.DateTimeField(db_column='BeginDate', auto_now=True)
     objects = QSManager(ClassFieldsQuerySet)()
-	    
+        
 
 class ActivityFieldsQuerySet(ClassFieldsQuerySet):
-	def filter_by_flowstatus(self, tag):
-		from django_cmdbuild.models import Lookup
-		l = Lookup.objects.get(type='FlowStatus', description=tag)
-		return self.filter(flowstatus=l.id)
-	def completed(self):
-		return self.filter_by_flowstatus('Completato')
+    def _filter_by_flowstatus(self, tag):
+        from django_cmdbuild.models import Lookup
+        l = Lookup.objects.get(type='FlowStatus', description=tag)
+        return self.filter(flowstatus=l.id)
+    def completed(self):
+        return self._filter_by_flowstatus('Completato')
+    def started(self):
+        return self._filter_by_flowstatus('Avviato')
+    def stopped(self):
+        return self._filter_by_flowstatus('Interrotto')
 
 class ActivityFields(ClassFields):
     from django_cmdbuild.models import Lookup
-    flowstatus = models.(db_column='FlowStatus',
+    flowstatus = models.IntegerField(db_column='FlowStatus',
         choices=Lookup.objects.choices(u'FlowStatus'))
     priority = models.IntegerField(db_column='Priority', null=True, blank=True)
     activitydefinitionid = models.CharField(max_length=200, db_column='ActivityDefinitionId')
