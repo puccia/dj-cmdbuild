@@ -1,9 +1,19 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
-from expander import ExpanderField
+from django_cmdbuild.remoteapi import http
 
+from expander import ExpanderField
 from querysets import *
+
+def from_kwargs(func):
+    def wrapper(*args, **kwargs):
+        name, value = kwargs.items()[0]
+        del kwargs[name]
+        kwargs['name'] = name
+        kwargs['value'] = value
+        return func(*args, **kwargs)
+    return wrapper
 
 class MapFields:
     pass
@@ -88,6 +98,34 @@ class CMDBActivityOptions(CMDBModelOptions):
         return self.history[0].begin_date
     flow_begin_date = property(_get_flow_begin_date)
 
+    def _get_flow_status_code(self):
+        return Lookup.objects.get(type='FlowStatus',id=self.flow_status)
+
+    def _is_stopped(self):
+        return self.flow_status == Lookup.objects.get(type='FlowStatus', code='Interrotto')
+    stopped = property(_is_stopped)
+    
+    def _is_started(self):
+        return self.flow_status == Lookup.objects.get(type='FlowStatus', code='Avviato')
+    started = property(_is_started)
+        
+    def _is_completed(self):
+        return self.flow_status == Lookup.objects.get(type='FlowStatus', code='Completato')
+    completed = property(_is_completed)
+
+    @from_kwargs
+    def update_attribute(self, name, value):
+        return http.Remote().request('card.update.id',(
+            self._meta.db_table,
+            self.pk,
+            self.encode_attribute(name, value)
+            )
+        )
+
+    def encode_attribute(self, name, value):
+        from django_cmdbuild.serializer.jsonconverter import as_string, AssetBean
+        return AssetBean(name=self._meta.get_field(name).db_column,
+            value=as_string(value))
 
 class CodeField(models.CharField):
     def __init__(self, *args, **kwargs):
