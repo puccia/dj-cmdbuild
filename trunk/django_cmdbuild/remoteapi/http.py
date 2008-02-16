@@ -52,14 +52,15 @@ class Remote(object):
 		self.url = '/' + self.url
 		self.conn = httplib.HTTPConnection(self.host)
 		self.conn.connect()
-		print self.conn, self.host, self.url
 
 	def request(self, command, data):
 		"""
 		Encode the data in CMDBuild's JSON dialect and send the command,
-		then return the decoded response
+		then return the decoded response.
 		"""
-		self.conn.request('POST', self.url, json.dumps(decorate(data)), {
+		import logging
+		data = json.dumps(decorate(data))
+		self.conn.request('POST', self.url, data, {
 			'Content-Type': 'text/plain',
 			'command': command
 			})
