@@ -63,6 +63,10 @@ def decorate(obj):
 		conv_objs = [decorate(o) for o in obj]
 		return {'JSONConverter.iscollection':
 			True, 'JSONConverter.collection': conv_objs }
+	elif isinstance(obj, dict):
+		d = dict([(k, decorate(v)) for k,v in obj.items()])
+		d['JSONConverter.map'] = True
+		return d
 	raise TypeError, 'Cannot serialize type %s (content: %s)' \
 		% (type(obj), obj)
 
@@ -83,6 +87,9 @@ def strip(obj):
 	# Case 1: collection
 	if 'JSONConverter.iscollection' in obj:
 		return [strip(item) for item in obj['JSONConverter.collection']]
+	if 'JSONConverter.map' in obj:
+		del obj['JSONConverter.map']
+		return dict([(k, strip(v)) for k,v in obj.items()])
 	# Case 2: encoded class
 	try:
 		original_class = obj['json.converter.original.class']
@@ -118,4 +125,4 @@ def as_string(value):
 	elif isinstance(value, basestring):
 		return value
 	else:
-		raise Exception, "Can't convert data of type %s" % type(value)
+		raise TypeError, "Can't convert data of type %s" % type(value)

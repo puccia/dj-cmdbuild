@@ -35,6 +35,8 @@ from django_cmdbuild.serializer.jsonconverter import decorate, strip, ServerExce
 class Remote(object):
 	class EmptyResponse(Exception):
 		pass
+	class GenericApplicationFailure(Exception):
+		pass
 	"""
 	This class handles a remote connection towards CMDBuild's engine.
 	"""
@@ -62,9 +64,9 @@ class Remote(object):
 			'command': command
 			})
 		answer = self.conn.getresponse().read()
-		if a.isspace():
+		if answer.isspace():
 			raise self.EmptyResponse
-		data = strip(json.loads(a))
+		data = strip(json.loads(answer))
 		if isinstance(data, ServerException):
 			raise data
 		return data

@@ -78,11 +78,45 @@ class CMDBModelOptions(object):
         return instance._enddate
     end_date = property(fget=_get_end_date)
 
+    @classmethod
+    def _make_bean(cls, name, value):
+        """
+        Take an attribute name and value (for this class), and return an
+        AssetBean that can be serialized and provided to CMDBuild over
+        a remote API call.
+        """
+        from django_cmdbuild.serializer.jsonconverter import as_string, AssetBean
+        # If it is an object, use its ID
+        if isinstance(value, models.Model):
+            value = value.pk
+        return AssetBean(name=cls._meta.get_field(name).db_column,
+            value=as_string(value))
+
+    @classmethod
+    def _get_cmdbuild_attributemap(cls, attributes):
+        """
+        Take a dictionary of attribute/value pairs and turn the Django instance
+        attribute names into CMDBuild attribute names.
+        """
+        if isinstance(value, models.Model):
+            value = value.pk
+        return dict([(cls._meta.get_field(name).db_column, value) for name, value
+            in attributes.items()])
+
+
 class CMDBActivityOptions(CMDBModelOptions):
+
     class ReadOnly(Exception):
+        """
+        NEVER save an Activity instance directly -- it would get out
+        of sync with respect to the Shark workflow.
+        """
         pass
+
     def save(self):
+        "Ban any attempt to save the instance."
         raise self.ReadOnly, 'Cannot save an Activity class'
+
     def _get_history(self):
         """
         Return a QuerySet with all cards belonging to this flow instance.
@@ -115,17 +149,38 @@ class CMDBActivityOptions(CMDBModelOptions):
 
     @from_kwargs
     def update_attribute(self, name, value):
-        return http.Remote().request('card.update.id',(
-            self._meta.db_table,
-            self.pk,
-            self.encode_attribute(name, value)
-            )
-        )
+        """
+        Update an attribute of this class (with ``attname=value`` syntax).
+        TODO: make sure that the Python instance is updated or discarded,
+        as its own attributes keep their old values.
+        """
+        remote = http.Remote()
+        resp = remote.request('card.update.id',( self._meta.db_table, self.pk,
+            self._make_bean(name, value)))
+        if resp is not True:
+            raise remote.GenericApplicationException(req)
 
-    def encode_attribute(self, name, value):
-        from django_cmdbuild.serializer.jsonconverter import as_string, AssetBean
-        return AssetBean(name=self._meta.get_field(name).db_column,
-            value=as_string(value))
+    @classmethod
+    def create(cls, **kwargs):
+        """
+        Ask CMDBuild to start a new instance of this Activity.  If any
+        attributes are provided, set them.
+        """
+        remote = http.Remote()
+        table = cls._meta.db_table
+        resp = remote.request('workflow.process.start', [table,
+            cls._get_cmdbuild_attributemap(kwargs)])
+        return cls.objects.get(process_code=resp)
+
+    def advance(self, **kwargs):
+	    """
+	    Ask CMDBuild to let this activity step ahead, optionally updating
+	    its attributes.
+	    """
+	    remote = http.Remote()
+	    table = self._meta.db_table
+	    return remote.request('workflow.process.update', [table,
+	        self.id, self._get_cmdbuild_attributemap(kwargs)])
 
 class CodeField(models.CharField):
     def __init__(self, *args, **kwargs):
