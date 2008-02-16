@@ -20,6 +20,10 @@ class MapFields:
 
 class CMDBModelOptions(object):
     def save(self, *args, **kwargs):
+        """
+        Saves a CMDbuild instance, taking care to set the ``status`` flag
+        and to get the right default value by polling the DB.
+        """
         if hasattr(self, 'status'):
             self.status = 'A'
         if self._meta.has_auto_field:
@@ -98,11 +102,30 @@ class CMDBModelOptions(object):
         Take a dictionary of attribute/value pairs and turn the Django instance
         attribute names into CMDBuild attribute names.
         """
-        if isinstance(value, models.Model):
-            value = value.pk
-        return dict([(cls._meta.get_field(name).db_column, value) for name, value
-            in attributes.items()])
+        # Turn objects into ids and turn names into column names
+        _map = {}
+        for name, value in attributes.items():
+            if isinstance(value, models.Model):
+                value = value.pk
+            _map[cls._meta.get_field(name).db_column] = value
+        return _map
 
+    def _get_full_attributemap(self):
+        """
+        Returns all attributes in a map. Mostly useful for debugging.
+        """
+        return dict([(f.attname, getattr(self, f.attname))
+            for f in self._meta.fields])
+
+    def _reload(self):
+        """
+        Gets the instance again from the DB and copies the field
+        attributes.  Ugly, but works.
+        """
+        updated = self.__class__.objects.get(pk=self.pk)
+        for field in self._meta.fields:
+            key = field.attname
+            setattr(self, key, getattr(updated, key))
 
 class CMDBActivityOptions(CMDBModelOptions):
 
@@ -147,18 +170,17 @@ class CMDBActivityOptions(CMDBModelOptions):
         return self.flow_status == Lookup.objects.get(type='FlowStatus', code='Completato')
     completed = property(_is_completed)
 
-    @from_kwargs
-    def update_attribute(self, name, value):
+    def update_attribute(self, **attrmap):
         """
         Update an attribute of this class (with ``attname=value`` syntax).
-        TODO: make sure that the Python instance is updated or discarded,
-        as its own attributes keep their old values.
         """
         remote = http.Remote()
-        resp = remote.request('card.update.id',( self._meta.db_table, self.pk,
-            self._make_bean(name, value)))
+        args = [self._meta.db_table, self.pk] + [self._make_bean(k, v)
+            for k, v in attrmap.items()]
+        resp = remote.request('card.update.id', args)
         if resp is not True:
             raise remote.GenericApplicationException(req)
+        self._reload()
 
     @classmethod
     def create(cls, **kwargs):
@@ -173,14 +195,17 @@ class CMDBActivityOptions(CMDBModelOptions):
         return cls.objects.get(process_code=resp)
 
     def advance(self, **kwargs):
-	    """
-	    Ask CMDBuild to let this activity step ahead, optionally updating
-	    its attributes.
-	    """
-	    remote = http.Remote()
-	    table = self._meta.db_table
-	    return remote.request('workflow.process.update', [table,
-	        self.id, self._get_cmdbuild_attributemap(kwargs)])
+        """
+        Ask CMDBuild to let this activity step ahead, optionally updating
+        its attributes.
+        """
+        remote = http.Remote()
+        table = self._meta.db_table
+        reply = remote.request('workflow.process.update',
+            [self._meta.db_table, self.pk,
+            self._get_cmdbuild_attributemap(kwargs)])
+        self._reload()
+        return reply
 
 class CodeField(models.CharField):
     def __init__(self, *args, **kwargs):
