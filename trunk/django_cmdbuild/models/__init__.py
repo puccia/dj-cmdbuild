@@ -3,9 +3,22 @@ from django.db import models
 from django_cmdbuild.models.querysets import QSManager, ClassFieldsQuerySet
 
 class LookUpManager(QSManager(ClassFieldsQuerySet)):
-    def choices(self, lookup):
-        c = self.active().filter(type__exact=lookup).values('id', 'description')
-        return [(c['id'], c['description']) for c in c]
+    def type(self, typename):
+		"Returns all Lookup objects of the given type."
+	    return self.active().filter(type__exact=typename)
+
+    def choices(self, typename):
+		"""
+		Returns all Lookup objects of the given type, in a format
+		suitable for usage as the ``choices`` keyword argument to
+		a Django field.
+		"""
+        rows = self.type(typename).values('id', 'description')
+        return [(r['id'], r['description']) for r in rows]
+
+    def get_label(self, typename, label):
+		"Returns a single Lookup object w/ the given type and label."
+		return self.get(type=typename, description=label)
 
 
 class Lookup(models.Model):

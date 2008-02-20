@@ -8,6 +8,8 @@ This may be extended in the future to talk more precisely to CMDBuild,
 once the need arises and the format is decoded.
 """
 
+from datetime import date
+
 class Bean(object):
 	"""
 	Encapsulates objects to be recognised by CMDBuild's deserializer.
@@ -67,7 +69,7 @@ def decorate(obj):
 		d = dict([(k, decorate(v)) for k,v in obj.items()])
 		d['JSONConverter.map'] = True
 		return d
-	raise TypeError, 'Cannot serialize type %s (content: %s)' \
+	raise TypeError, "Don't know how serialize type %s (content: %s)" \
 		% (type(obj), obj)
 
 def clean_attributes(obj):
@@ -124,5 +126,7 @@ def as_string(value):
 		return "%s" % value
 	elif isinstance(value, basestring):
 		return value
+	elif isinstance(value, date):
+		return value.isoformat()
 	else:
 		raise TypeError, "Can't convert data of type %s" % type(value)
