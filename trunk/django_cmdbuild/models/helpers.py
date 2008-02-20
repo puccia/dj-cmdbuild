@@ -1,8 +1,8 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
-from expander import ExpanderField
-from querysets import *
+from django_cmdbuild.models.expander import ExpanderField
+from django_cmdbuild.models.querysets import *
 
 def from_kwargs(func):
     def wrapper(*args, **kwargs):
