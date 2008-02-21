@@ -241,15 +241,14 @@ class Command(NoArgsCommand):
             # History views are handled separately
             if table_name.endswith('_history'):
                 continue
+            # LookUp has its own built-in model
+            if table_name == 'LookUp':
+                continue
             mc = store.model(table_name)
             # Special CMDBuild cases
             skip_rows = []
             extra_attributes = []
             names = []
-            if table_name == 'LookUp':
-                #mc.extra('objects = LookUpManager()')
-                mc.add_field(Field('objects', 'LookUpManager'))
-                store.with_lookup()
             # Collect
             for row in introspection_module.get_table_description(cursor, table_name):
                 names.append(row[0].lower())
@@ -391,10 +390,12 @@ class Command(NoArgsCommand):
                         if ( len(cat_entry['lookup']) > 0 
                             and (not table_name == 'Lookup')):
                             #extra_params['choices'] = 'Lookup.objects.choices(%r)' % cat_entry['lookup']
-                            f.add_kw_param('choices', 'Lookup.objects.choices(%r)' % cat_entry['lookup'],
-                                representation=False)
-                            store.model('LookUp').add_edge(mc.name)
-                            store.with_lookup()
+                            #f.add_kw_param('choices', 'Lookup.objects.choices(%r)' % cat_entry['lookup'],
+                                #representation=False)
+                            #store.model('LookUp').add_edge(mc.name)
+                            f.set_class('LookupField')
+                            f.add_param(cat_entry['lookup'])
+                            #store.with_lookup()
 
                     # Add primary_key and unique, if necessary.
                     if f.db_column in indexes:
