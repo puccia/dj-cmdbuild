@@ -170,7 +170,16 @@ class LookupField(models.IntegerField):
 		super(LookupField, self).contribute_to_class(cls, name)
 		setattr(cls, name + '_text', property(lambda instance:
 			self.get_lookup_label(getattr(instance, name))))
-		
+		setattr(cls, name + '_objects', Lookup.objects.filter(
+			type=self.lookup_type))
+	def get_db_prep_save(self, value):
+		if isinstance(value, Lookup):
+			if value.type != self.lookup_type:
+				# TODO: Subclass Exception
+				raise Exception, 'Saving wrong lookup type'
+			value = value.number
+		return super(LookupField, self).get_db_prep_save(value)
+
 class IdClassField(models.TextField):
     def __init__(self):
         pass
