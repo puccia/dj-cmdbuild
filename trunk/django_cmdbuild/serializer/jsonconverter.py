@@ -61,6 +61,10 @@ def decorate(obj):
 		return add_type(obj, 'java.lang.String')
 	elif isinstance(obj, bool):
 		return add_type(obj, 'java.lang.Boolean')
+	elif isinstance(obj, date):
+		# TODO: test
+		from time import mktime
+		return add_type(long(mktime(obj.timetuple()) * 1000), 'java.util.Date')
 	elif isinstance(obj, (list, tuple)):
 		conv_objs = [decorate(o) for o in obj]
 		return {'JSONConverter.iscollection':
@@ -102,6 +106,9 @@ def strip(obj):
 		# Act according to the class type
 		if original_class in ('java.lang.String', 'java.lang.Boolean'):
 			return obj['JSONConverter.value']
+		elif original_class == 'java.util.Date':
+			# Java returns this in milliseconds since the epoch
+			return date.fromtimestamp(obj['JSONConverter.value']/1000)
 		elif original_class in ('cmdbuild.collection.LookupBean',):
 			return clean_attributes(obj)
 		raise TypeError, "Cannot decode original class %s "\
