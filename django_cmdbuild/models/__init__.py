@@ -2,7 +2,7 @@ from django.db import models
 
 from django_cmdbuild.models.querysets import QSManager, ClassFieldsQuerySet
 
-class LookUpManager(QSManager(ClassFieldsQuerySet)):
+class LookupQuerySet(ClassFieldsQuerySet):
     def type(self, typename):
         "Returns all Lookup objects of the given type."
         return self.active().filter(type__exact=typename)
@@ -20,13 +20,16 @@ class LookUpManager(QSManager(ClassFieldsQuerySet)):
         "Returns a single Lookup object w/ the given type and label."
         return self.get(type=typename, description=label)
 
+    def by_label(self, label):
+	    return self.get(description=label)
+
     def get_by_number(self, typename, number):
         "Returns a single Lookup object of the given type and number."
         return self.get(type=typename, number=number)
 
 
 class Lookup(models.Model):
-      objects = LookUpManager()
+      objects = QSManager(LookupQuerySet)()
       id = models.IntegerField(primary_key=True, db_column='Id', blank=True, help_text=u'Topic', null=True)
       type = models.CharField(help_text=u'Topic', max_length=32, blank=True, db_column='Type')
       parenttype = models.CharField(help_text=u'Topic', max_length=32, blank=True, db_column='ParentType')
