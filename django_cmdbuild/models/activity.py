@@ -1,4 +1,4 @@
-from django_cmdbuild.models.helpers import ClassFields, CMDBModelOptions
+from django_cmdbuild.models.helpers import ClassFields, CMDBModelOptions, LookupField
 from django_cmdbuild.models.querysets import *
 from django_cmdbuild.remoteapi import http
 
@@ -95,13 +95,25 @@ class ActivityFieldsQuerySet(ClassFieldsQuerySet):
     def stopped(self):
         return self._filter_by_flow_status('Interrotto')
 
+class ActivityManager(QSManager(ActivityFieldsQuerySet)):
+    def create(self, **kwargs):
+        """
+        Ask CMDBuild to start a new instance of this Activity.  If any
+        attributes are provided, set them.
+        """
+        remote = http.Remote()
+        table = self.model._meta.db_table
+        resp = remote.request('workflow.process.start', [table,
+            self.model._get_cmdbuild_attributemap(kwargs)])
+        return self.model.objects.get(process_code=resp)
+
 class ActivityFields(ClassFields):
     from django_cmdbuild.models import Lookup
-    flow_status = models.IntegerField(db_column='FlowStatus',
-        choices=Lookup.objects.choices(u'FlowStatus'))
+    flow_status = LookupField('FlowStatus', db_column='FlowStatus')
     priority = models.IntegerField(db_column='Priority', null=True, blank=True)
     activity_definition = models.CharField(max_length=200, db_column='ActivityDefinitionId')
     process_code = models.CharField(max_length=200, db_column='ProcessCode')
     quick_accept = models.BooleanField(db_column='IsQuickAccept')
     activity_description = models.TextField(db_column='ActivityDescription', blank=True)
-    objects = QSManager(ActivityFieldsQuerySet)()
+    objects = ActivityManager()
+

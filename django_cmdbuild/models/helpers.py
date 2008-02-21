@@ -3,6 +3,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from django_cmdbuild.models.expander import ExpanderField
 from django_cmdbuild.models.querysets import *
+from django_cmdbuild.models import Lookup
 
 def from_kwargs(func):
     def wrapper(*args, **kwargs):
@@ -148,6 +149,28 @@ class DescriptionField(models.CharField):
         setattr(cls, '_description', property(read_description))
         super(DescriptionField, self).contribute_to_class(cls, name)
 
+class LookupDescriptor(object):
+	def __init__(self, attribute_name):
+		self.attribute_name = attribute_name
+	
+
+class LookupField(models.IntegerField):
+	def get_internal_type(self):
+		return "IntegerField"
+	def __init__(self, lookup_type, *args, **kwargs):
+		self.lookup_type = lookup_type
+		kwargs.setdefault('choices', Lookup.objects.choices(lookup_type))
+		super(LookupField, self).__init__(*args, **kwargs)
+	def get_lookup_obj(self, number):
+		return Lookup.objects.get_by_number(self.lookup_type, number)
+	def get_lookup_label(self, number):
+		return self.get_lookup_obj(number).description
+	def contribute_to_class(self, cls, name):
+		self.attribute_name = name
+		super(LookupField, self).contribute_to_class(cls, name)
+		setattr(cls, name + '_text', property(lambda instance:
+			self.get_lookup_label(getattr(instance, name))))
+		
 class IdClassField(models.TextField):
     def __init__(self):
         pass

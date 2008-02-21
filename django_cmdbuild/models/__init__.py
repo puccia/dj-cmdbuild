@@ -20,6 +20,10 @@ class LookUpManager(QSManager(ClassFieldsQuerySet)):
         "Returns a single Lookup object w/ the given type and label."
         return self.get(type=typename, description=label)
 
+    def get_by_number(self, typename, number):
+        "Returns a single Lookup object of the given type and number."
+        return self.get(type=typename, number=number)
+
 
 class Lookup(models.Model):
       objects = LookUpManager()
@@ -34,6 +38,8 @@ class Lookup(models.Model):
       status = models.TextField(help_text=u'Topic', blank=True, db_column='Status') # This field type is a guess.
       notes = models.TextField(help_text=u'Topic', blank=True, db_column='Notes')
       class Admin:
-          pass
+          list_display = ('type', 'description')
       class Meta:
           db_table = u'LookUp'
+      def __unicode__(self):
+          return self.description
