@@ -181,6 +181,8 @@ class LookupField(models.IntegerField):
 		return super(LookupField, self).get_db_prep_save(value)
 
 class IdClassField(models.TextField):
+    ### XXX Check that this makes sense
+    rel = None
     def __init__(self):
         pass
     opts = {'db_column': 'IdClass', 'editable': False}

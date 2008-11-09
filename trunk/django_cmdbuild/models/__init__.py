@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib import admin
 
 from django_cmdbuild.models.querysets import QSManager, ClassFieldsQuerySet
 
@@ -46,3 +47,6 @@ class Lookup(models.Model):
           db_table = u'LookUp'
       def __unicode__(self):
           return self.description
+
+class CMDBuildAdmin(admin.ModelAdmin):
+    list_display = list_display = ('_description', 'code', 'status')
