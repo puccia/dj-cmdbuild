@@ -50,6 +50,7 @@ from django.db import models
 class CMDBManyToManyField(models.ManyToManyField):
     def __init__(self, *args, **kwargs):
         kwargs['limit_choices_to'] = {'status__exact': 'A'}
+        self.reversed = False
         if 'reversed' in kwargs:
             if kwargs['reversed']:
                 self.reversed = True
