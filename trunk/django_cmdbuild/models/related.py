@@ -50,11 +50,21 @@ from django.db import models
 class CMDBManyToManyField(models.ManyToManyField):
     def __init__(self, *args, **kwargs):
         kwargs['limit_choices_to'] = {'status__exact': 'A'}
+        if 'reversed' in kwargs:
+            if kwargs['reversed']:
+                self.reversed = True
+                del kwargs['reversed']
         super(CMDBManyToManyField, self).__init__(*args, **kwargs)
     def _get_m2m_column_name(self, related):
-        return 'IdObj1'
+        if self.reversed:
+            return 'IdObj2'
+        else:
+            return 'IdObj1'
     def _get_m2m_reverse_name(self, related):
-        return 'IdObj2'
+        if self.reversed:
+            return 'IdObj1'
+        else:
+            return 'IdObj2'
     def contribute_to_class(self, cls, name):
         super(CMDBManyToManyField, self).contribute_to_class(cls, name)
         desc = cls.__dict__[name]
