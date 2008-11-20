@@ -40,11 +40,12 @@ class CMDBModelOptions(object):
         models.Model.save(self, *args, **kwargs)
 
     def __unicode__(self):
-        if self._description:
-            return self._description
-        else:
-            return unicode(self.pk)
-   
+        try:
+            if self._description:
+                return self._description
+        except AttributeError:
+            pass
+        return unicode(self.pk)
 
     def _get_status_and_date(self):
         if self.status == 'A':
@@ -204,4 +205,5 @@ class ClassFields:
     user = models.CharField(max_length=20, db_column='User', blank=True, null=True)
     begin_date = models.DateTimeField(db_column='BeginDate', auto_now=True)
     objects = QSManager(ClassFieldsQuerySet)()
+    notes = models.TextField(_('notes'), db_column='Notes', blank=True, null=True)
         
