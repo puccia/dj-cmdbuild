@@ -14,7 +14,7 @@ class QueryClassCatalog(object):
         cursor.execute('SELECT classname, attributename, classcomment, attributemode, attributedescription, attributelookup, '
                'attributenull, attributedefault '
                'FROM cmdbclasscatalog')
-        print cursor.description
+        #print cursor.description
 
         def fetchall(cursor):
             bare_rows = cursor.fetchall()
