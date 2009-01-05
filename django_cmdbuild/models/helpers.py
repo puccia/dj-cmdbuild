@@ -136,6 +136,11 @@ class CodeField(models.CharField):
         super(CodeField, self).__init__(*args, **kwargs)
     def get_internal_type(self):
         return "CharField"
+    def contribute_to_class(self, cls, name):
+        def read_code(self):
+            return getattr(self, name)
+        setattr(cls, '_code', property(read_code))
+        super(CodeField, self).contribute_to_class(cls, name)
 
 class DescriptionField(models.CharField):
     def __init__(self, *args, **kwargs):
