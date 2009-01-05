@@ -49,4 +49,4 @@ class Lookup(models.Model):
           return self.description
 
 class CMDBuildAdmin(admin.ModelAdmin):
-    list_display = list_display = ('_description', 'code', 'status')
+    list_display = list_display = ('_description', '_code', 'status')
