@@ -23,8 +23,12 @@ class CMDBModelOptions(object):
         Saves a CMDbuild instance, taking care to set the ``status`` flag
         and to get the right default value by polling the DB.
         """
-        if hasattr(self, 'status'):
-            self.status = 'A'
+        if 'cmdbuild_delete' in kwargs.keys():
+            if kwargs['cmdbuild_delete']:
+                self.status = 'N'
+        else:
+            if hasattr(self, 'status'):
+                self.status = 'A'
         if self._meta.has_auto_field:
             from django.utils.encoding import smart_unicode
             pk_val = self._get_pk_val()
@@ -47,8 +51,7 @@ class CMDBModelOptions(object):
         pk_set = pk_val is not None and smart_unicode(pk_val) != u''
         assert pk_set, "%s object can't be deleted because its %s attribute" \
             " is set to None." % (self._meta.object_name, self._meta.pk.attname)
-        self.status = 'N'
-        self.save()
+        self.save(cmdbuild_delete=True)
 
     def __unicode__(self):
         try:
