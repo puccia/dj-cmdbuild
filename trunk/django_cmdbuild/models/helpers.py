@@ -38,6 +38,17 @@ class CMDBModelOptions(object):
                 r = cursor.fetchall()[0]
                 setattr(self, self._meta.pk.attname, r[0])
         models.Model.save(self, *args, **kwargs)
+    
+    
+    
+    def delete(self):
+        from django.utils.encoding import smart_unicode
+        pk_val = self._get_pk_val()
+        pk_set = pk_val is not None and smart_unicode(pk_val) != u''
+        assert pk_set, "%s object can't be deleted because its %s attribute" \
+            " is set to None." % (self._meta.object_name, self._meta.pk.attname)
+        self.status = 'N'
+        self.save()
 
     def __unicode__(self):
         try:
