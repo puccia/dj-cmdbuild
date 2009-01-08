@@ -26,6 +26,7 @@ class CMDBModelOptions(object):
         if 'cmdbuild_delete' in kwargs.keys():
             if kwargs['cmdbuild_delete']:
                 self.status = 'N'
+            del kwargs['cmdbuild_delete']
         else:
             if hasattr(self, 'status'):
                 self.status = 'A'
