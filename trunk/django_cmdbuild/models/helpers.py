@@ -47,12 +47,22 @@ class CMDBModelOptions(object):
     
     
     def delete(self):
-        from django.utils.encoding import smart_unicode
-        pk_val = self._get_pk_val()
-        pk_set = pk_val is not None and smart_unicode(pk_val) != u''
-        assert pk_set, "%s object can't be deleted because its %s attribute" \
-            " is set to None." % (self._meta.object_name, self._meta.pk.attname)
-        self.save(cmdbuild_delete=True)
+        from django.db.models.query import CollectedObjects
+        collected = CollectedObjects()
+        self._collect_sub_objects(collected)
+        print collected.items()
+        for klass, instances in collected.items():
+            for i in instances.values():
+                if isinstance(i, CMDBModelOptions):
+                    print 'Deleting', i
+                    from django.utils.encoding import smart_unicode
+                    pk_val = i._get_pk_val()
+                    pk_set = pk_val is not None and smart_unicode(pk_val) != u''
+                    assert pk_set, "%s object can't be deleted because its %s attribute" \
+                        " is set to None." % (i._meta.object_name, i._meta.pk.attname)
+                    i.save(cmdbuild_delete=True)
+                else:
+                    i.delete()
 
     def __unicode__(self):
         try:
