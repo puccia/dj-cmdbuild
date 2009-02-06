@@ -69,7 +69,7 @@ def decorate(obj):
         try:
             conv_objs = [decorate(o) for o in obj]
         except TypeError, e:
-            raise TypeError('%s while converting %r' % (e, conv_objs))
+            raise TypeError('%s while converting %r' % (e, obj))
         return {'JSONConverter.iscollection':
             True, 'JSONConverter.collection': conv_objs }
     elif isinstance(obj, dict):
