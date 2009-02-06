@@ -110,7 +110,8 @@ def strip(obj):
         original_class = None
     if original_class:
         # Act according to the class type
-        if original_class in ('java.lang.String', 'java.lang.Boolean'):
+        if original_class in ('java.lang.String', 'java.lang.Boolean',
+            'java.lang.Integer'):
             return obj['JSONConverter.value']
         elif original_class == 'java.util.Date':
             # Java returns this in milliseconds since the epoch
