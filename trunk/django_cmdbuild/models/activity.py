@@ -94,8 +94,6 @@ class ActivityFieldsQuerySet(ClassFieldsQuerySet):
         return self._filter_by_flow_status('Avviato')
     def stopped(self):
         return self._filter_by_flow_status('Interrotto')
-
-class ActivityManager(QSManager(ActivityFieldsQuerySet)):
     def create(self, **kwargs):
         """
         Ask CMDBuild to start a new instance of this Activity.  If any
@@ -106,6 +104,9 @@ class ActivityManager(QSManager(ActivityFieldsQuerySet)):
         resp = remote.request('workflow.process.start', [table,
             self.model._get_cmdbuild_attributemap(kwargs)])
         return self.model.objects.get(process_code=resp)
+
+class ActivityManager(QSManager(ActivityFieldsQuerySet)):
+    pass
 
 class ActivityFields(ClassFields):
     from django_cmdbuild.models import Lookup
