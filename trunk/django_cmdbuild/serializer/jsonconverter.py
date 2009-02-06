@@ -66,11 +66,17 @@ def decorate(obj):
 		from time import mktime
 		return add_type(long(mktime(obj.timetuple()) * 1000), 'java.util.Date')
 	elif isinstance(obj, (list, tuple)):
-		conv_objs = [decorate(o) for o in obj]
+	    try:
+		    conv_objs = [decorate(o) for o in obj]
+		except TypeError, e:
+		    raise TypeError('%s while converting %r' % (e, conv_objs))
 		return {'JSONConverter.iscollection':
 			True, 'JSONConverter.collection': conv_objs }
 	elif isinstance(obj, dict):
-		d = dict([(k, decorate(v)) for k,v in obj.items()])
+	    try:
+		    d = dict([(k, decorate(v)) for k,v in obj.items()])
+		except TypeError, e:
+		    raise TypeError('%s while converting %r' % (e, obj))
 		d['JSONConverter.map'] = True
 		return d
 	raise TypeError, "Don't know how serialize type %s (content: %s)" \
