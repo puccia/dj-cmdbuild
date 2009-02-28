@@ -131,51 +131,14 @@ class CMDBManyToManyField(models.ManyToManyField):
 
         from django.db import connection
         cursor = connection.cursor()
-        cursor.execute('CREATE TEMPORARY VIEW "%s" AS SELECT * FROM '
+        cursor.execute('CREATE OR REPLACE TEMPORARY VIEW "%s" AS SELECT * FROM '
             '"%s" WHERE "Status" = \'A\'' % (self.db_table, self.writable_db_table))
-            
-            
-        #cursor.execute('CREATE RULE maininsert_%(realtable)s ON INSERT TO %(view)s ')
-        insert_rule = '''CREATE RULE %(insertrule)s AS
-            ON INSERT TO %(view)s
-                WHERE
-                    NOT EXISTS (SELECT 1 FROM %(realtable)s
-                        WHERE "%(col)s" = NEW."%(col)s" AND "%(rev)s" = NEW."%(rev)s")
-                DO INSTEAD
-                INSERT INTO %(realtable)s ("IdDomain", "IdClass1", "IdClass2",
-                "Status", %(col)s, %(rev)s, "BeginDate") VALUES ('%(realtable)s', '%(coltable)s',
-                '%(revtable)s', 'A', NEW.%(col)s, NEW.%(rev)s, now())
-        '''
-        update_rule = '''CREATE RULE %(updaterule)s AS
-            ON INSERT TO %(view)s
-                WHERE
-                     EXISTS (SELECT 1 FROM %(realtable)s
-                        WHERE %(col)s = NEW.%(col)s AND %(rev)s = NEW.%(rev)s)
-            DO INSTEAD
-                UPDATE %(realtable)s SET "Status" = \'A\', "BeginDate" = now()
-                WHERE %(col)s = NEW.%(col)s AND %(rev)s = NEW.%(rev)s
-        '''
-            
-        disable_insert_rule = """CREATE RULE %(insertrule)s AS
-            ON INSERT TO %(view)s DO INSTEAD
-            SELECT createrelation(
-                '%(realtable)s'::regclass::integer,
-                '%(coltable)s'::regclass::integer,
-                NEW.%(col)s::integer, 
-                '%(revtable)s'::regclass::integer,
-                NEW.%(rev)s::integer,
-                'A',
-                'djcmdbuild',
-                '%(realtablenq)s')"""
-            
-        delete_rule = 'CREATE RULE "%(deleterule)s" AS ' \
+                        
+        delete_rule = 'CREATE OR REPLACE RULE "%(deleterule)s" AS ' \
             'ON DELETE TO "%(view)s" DO INSTEAD ' \
             'UPDATE "%(realtable)s" SET "Status" = \'N\' ' \
             'WHERE "%(col)s" = OLD."%(col)s" AND "%(rev)s" = OLD."%(rev)s"'
-        #z = insert_rule % qd
-        #cursor.execute(z)
-        z = delete_rule % self.querydict
-        cursor.execute(z)
+        cursor.execute(delete_rule % self.querydict)
         
     def contribute_to_related_class(self, cls, related):
         super(CMDBManyToManyField, self).contribute_to_related_class(cls, related)
