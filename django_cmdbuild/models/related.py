@@ -1,17 +1,18 @@
 from django.utils.functional import curry
 
 class MaskingDescriptor(object):
-    def __init__(self, orig_desc):
+    def __init__(self, orig_desc, querydict):
         self.orig_desc = orig_desc
+        self.querydict = querydict
     # __get__ must modify the returned manager
-    def __get__(self, *args, **kwargs):
-        orig_manager = self.orig_desc.__get__(*args, **kwargs)
+    def __get__(self_desc, *args, **kwargs):
+        orig_manager = self_desc.orig_desc.__get__(*args, **kwargs)
         class CMDBMapManager(type(orig_manager)):
             def __init__(self, orig):
                 for k, v in orig.__dict__.items():
                     self.__dict__[k] = v
             #def _add_items(self, source_col_name, target_col_name, *objs):
-            def _DISABLED_add_items(self, source_col_name, target_col_name, *objs):
+            def _add_items(self, source_col_name, target_col_name, *objs):
                 # join_table: name of the m2m link table
                 # source_col_name: the PK colname in join_table for the source object
                 # target_col_name: the PK colname in join_table for the target object
@@ -36,18 +37,51 @@ class MaskingDescriptor(object):
                         [self._pk_val] + list(new_ids))
                     existing_ids = set([row[0] for row in cursor.fetchall()])
 
-                    # Add the ones that aren't there already
-                    sql = ("INSERT INTO %s (\"IdDomain\", \"IdClass1\", \"IdClass2\", \"Status\", %s, %s) "
-                        "VALUES ('%s', '\"%s\"', '\"%s\"', 'A', %%s, %%s)" % \
-                        (self.join_table, source_col_name, target_col_name, self.join_table,
-                        self.instance._meta.db_table, self.model._meta.db_table))
-                    for obj_id in (new_ids - existing_ids):
-                        cursor.execute(sql,
-                            [self._pk_val, obj_id])
+                    # Get IDs
+                    print self_desc.querydict
+                    if source_col_name == '"IdObj1"':
+                        invert = False
+                    elif source_col_name == '"IdObj2"':
+                        invert = True
+                    else:
+                        raise Exception, 'Invalid column name: %s' % source_col_name
+                    cursor.execute ("""
+                    SELECT '"%(realtable)s"'::regclass::integer,
+                        '"%(coltable)s"'::regclass::integer,
+                        '"%(revtable)s"'::regclass::integer
+                    """ % self_desc.querydict)
+                    relation_oid, col_oid, rev_oid = cursor.fetchall()[0]
+                    print 'Coltable', self_desc.querydict['coltable'], \
+                        'has OID', col_oid
+                    print 'Revtable', self_desc.querydict['revtable'], \
+                        'has OID', rev_oid
+                    idclass1_oid, idclass2_oid = col_oid, rev_oid
+                    print relation_oid, idclass1_oid, idclass2_oid
+                    
+                    sql = """SELECT createrelation('%(domainid)s', '%(idclass1)s',
+                        '%(idobj1)s', '%(idclass2)s', '%(idobj2)s', 'A', 'dj-cmdbuild',
+                        '%(realtable)s')
+                    """ % {
+                        'domainid': relation_oid,
+                        'idclass1': idclass1_oid,
+                        'idobj1': '%s',
+                        'idclass2': idclass2_oid,
+                        'idobj2': '%s',
+                        'realtable': self_desc.querydict['realtable'],
+                    }
+                    print sql
+                    if not invert:
+                        for obj_id in (new_ids - existing_ids):
+                            cursor.execute(sql,
+                                [self._pk_val, obj_id])
+                    else:
+                        for obj_id in (new_ids - existing_ids):
+                            cursor.execute(sql,
+                                [obj_id, self._pk_val])                        
                     from django.db import transaction
                     transaction.commit_unless_managed()
-        #return CMDBMapManager(orig_manager)
-        return orig_manager
+        return CMDBMapManager(orig_manager)
+        #return orig_manager
             
 from django.db import models
 
@@ -63,6 +97,15 @@ class CMDBManyToManyField(models.ManyToManyField):
         self.writable_db_table = kwargs['db_table']
         kwargs['db_table'] = 'pure_' + kwargs['db_table']
         super(CMDBManyToManyField, self).__init__(*args, **kwargs)
+        qd = {
+            'view': self.db_table,
+            'realtable': self.writable_db_table,
+            'col': self._get_m2m_column_name(None),
+            'rev': self._get_m2m_reverse_name(None),
+            'deleterule': 'deleterule_' + self.writable_db_table,
+            'reversed': self.reversed
+        }
+        self.querydict = qd
         
     def _get_m2m_column_name(self, related):
         if self.reversed:
@@ -79,43 +122,66 @@ class CMDBManyToManyField(models.ManyToManyField):
     def contribute_to_class(self, cls, name):
         super(CMDBManyToManyField, self).contribute_to_class(cls, name)
         desc = cls.__dict__[name]
-        #setattr(cls, name, MaskingDescriptor(desc))
+        setattr(cls, name, MaskingDescriptor(desc, self.querydict))
+
+        if not self.reversed:
+            self.querydict.update({
+                'coltable': cls._meta.db_table,
+                'revtable': self.model.to._meta.db_table,
+            })
+        else:
+            self.querydict.update({
+                'revtable': cls._meta.db_table,
+                'coltable': self.rel.to._meta.db_table,
+            })
+
 
         from django.db import connection
         cursor = connection.cursor()
-        qn = connection.ops.quote_name
-        qd = {
-            'view': qn(self.db_table),
-            'realtable': qn(self.writable_db_table),
-            'col': qn(self._get_m2m_column_name(None)),
-            'rev': qn(self._get_m2m_reverse_name(None)),
-            'insertrule': qn('insertrule_' + self.writable_db_table),
-            'deleterule': qn('deleterule_' + self.writable_db_table),
-        }
-        if not self.reversed:
-            qd.update({
-                'coltable': qn(cls._meta.db_table),
-                'revtable': qn(self.model.to._meta.db_table)
-            })
-        else:
-            qd.update({
-                'revtable': qn(cls._meta.db_table),
-                'coltable': qn(self.rel.to._meta.db_table)
-            })
-        cursor.execute('CREATE TEMPORARY VIEW %s AS SELECT * FROM '
-            '%s WHERE "Status" = \'A\'' % (qn(self.db_table), qn(self.writable_db_table)))
-        insert_rule = 'CREATE RULE %(insertrule)s AS ' \
-            'ON INSERT TO %(view)s DO INSTEAD ' \
-            'INSERT INTO %(realtable)s ("IdDomain", "IdClass1", "IdClass2", ' \
-            '"Status", %(col)s, %(rev)s) VALUES (\'%(realtable)s\', \'%(coltable)s\', ' \
-            '\'%(revtable)s\', \'A\', NEW.%(col)s, NEW.%(rev)s)'
-        delete_rule = 'CREATE RULE %(deleterule)s AS ' \
-            'ON DELETE TO %(view)s DO INSTEAD ' \
-            'UPDATE %(realtable)s SET "Status" = \'N\' ' \
-            'WHERE %(col)s = OLD.%(col)s AND %(rev)s = OLD.%(rev)s'
-        z = insert_rule % qd
-        cursor.execute(z)
-        z = delete_rule % qd
+        cursor.execute('CREATE TEMPORARY VIEW "%s" AS SELECT * FROM '
+            '"%s" WHERE "Status" = \'A\'' % (self.db_table, self.writable_db_table))
+            
+            
+        #cursor.execute('CREATE RULE maininsert_%(realtable)s ON INSERT TO %(view)s ')
+        insert_rule = '''CREATE RULE %(insertrule)s AS
+            ON INSERT TO %(view)s
+                WHERE
+                    NOT EXISTS (SELECT 1 FROM %(realtable)s
+                        WHERE "%(col)s" = NEW."%(col)s" AND "%(rev)s" = NEW."%(rev)s")
+                DO INSTEAD
+                INSERT INTO %(realtable)s ("IdDomain", "IdClass1", "IdClass2",
+                "Status", %(col)s, %(rev)s, "BeginDate") VALUES ('%(realtable)s', '%(coltable)s',
+                '%(revtable)s', 'A', NEW.%(col)s, NEW.%(rev)s, now())
+        '''
+        update_rule = '''CREATE RULE %(updaterule)s AS
+            ON INSERT TO %(view)s
+                WHERE
+                     EXISTS (SELECT 1 FROM %(realtable)s
+                        WHERE %(col)s = NEW.%(col)s AND %(rev)s = NEW.%(rev)s)
+            DO INSTEAD
+                UPDATE %(realtable)s SET "Status" = \'A\', "BeginDate" = now()
+                WHERE %(col)s = NEW.%(col)s AND %(rev)s = NEW.%(rev)s
+        '''
+            
+        disable_insert_rule = """CREATE RULE %(insertrule)s AS
+            ON INSERT TO %(view)s DO INSTEAD
+            SELECT createrelation(
+                '%(realtable)s'::regclass::integer,
+                '%(coltable)s'::regclass::integer,
+                NEW.%(col)s::integer, 
+                '%(revtable)s'::regclass::integer,
+                NEW.%(rev)s::integer,
+                'A',
+                'djcmdbuild',
+                '%(realtablenq)s')"""
+            
+        delete_rule = 'CREATE RULE "%(deleterule)s" AS ' \
+            'ON DELETE TO "%(view)s" DO INSTEAD ' \
+            'UPDATE "%(realtable)s" SET "Status" = \'N\' ' \
+            'WHERE "%(col)s" = OLD."%(col)s" AND "%(rev)s" = OLD."%(rev)s"'
+        #z = insert_rule % qd
+        #cursor.execute(z)
+        z = delete_rule % self.querydict
         cursor.execute(z)
         
     def contribute_to_related_class(self, cls, related):
@@ -125,9 +191,10 @@ class CMDBManyToManyField(models.ManyToManyField):
             if name:
                 try:
                     desc = cls.__dict__[name]
-                    #setattr(cls, name, MaskingDescriptor(desc))
+                    setattr(cls, name, MaskingDescriptor(desc, self.querydict))
                 except KeyError:
                     pass
         except AttributeError:
             pass
-
+    
+        
