@@ -38,7 +38,6 @@ class MaskingDescriptor(object):
                     existing_ids = set([row[0] for row in cursor.fetchall()])
 
                     # Get IDs
-                    print self_desc.querydict
                     if source_col_name == '"IdObj1"':
                         invert = False
                     elif source_col_name == '"IdObj2"':
@@ -51,12 +50,7 @@ class MaskingDescriptor(object):
                         '"%(revtable)s"'::regclass::integer
                     """ % self_desc.querydict)
                     relation_oid, col_oid, rev_oid = cursor.fetchall()[0]
-                    print 'Coltable', self_desc.querydict['coltable'], \
-                        'has OID', col_oid
-                    print 'Revtable', self_desc.querydict['revtable'], \
-                        'has OID', rev_oid
                     idclass1_oid, idclass2_oid = col_oid, rev_oid
-                    print relation_oid, idclass1_oid, idclass2_oid
                     
                     sql = """SELECT createrelation('%(domainid)s', '%(idclass1)s',
                         '%(idobj1)s', '%(idclass2)s', '%(idobj2)s', 'A', 'dj-cmdbuild',
@@ -69,7 +63,6 @@ class MaskingDescriptor(object):
                         'idobj2': '%s',
                         'realtable': self_desc.querydict['realtable'],
                     }
-                    print sql
                     if not invert:
                         for obj_id in (new_ids - existing_ids):
                             cursor.execute(sql,
