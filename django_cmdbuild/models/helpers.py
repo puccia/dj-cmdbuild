@@ -50,11 +50,9 @@ class CMDBModelOptions(object):
         from django.db.models.query import CollectedObjects
         collected = CollectedObjects()
         self._collect_sub_objects(collected)
-        print collected.items()
         for klass, instances in collected.items():
             for i in instances.values():
                 if isinstance(i, CMDBModelOptions):
-                    print 'Deleting', i
                     from django.utils.encoding import smart_unicode
                     pk_val = i._get_pk_val()
                     pk_set = pk_val is not None and smart_unicode(pk_val) != u''

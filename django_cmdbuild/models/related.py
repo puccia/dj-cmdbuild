@@ -1,3 +1,5 @@
+from django.utils.functional import curry
+
 class MaskingDescriptor(object):
     def __init__(self, orig_desc):
         self.orig_desc = orig_desc
@@ -8,7 +10,8 @@ class MaskingDescriptor(object):
             def __init__(self, orig):
                 for k, v in orig.__dict__.items():
                     self.__dict__[k] = v
-            def _add_items(self, source_col_name, target_col_name, *objs):
+            #def _add_items(self, source_col_name, target_col_name, *objs):
+            def _DISABLED_add_items(self, source_col_name, target_col_name, *objs):
                 # join_table: name of the m2m link table
                 # source_col_name: the PK colname in join_table for the source object
                 # target_col_name: the PK colname in join_table for the target object
@@ -43,7 +46,8 @@ class MaskingDescriptor(object):
                             [self._pk_val, obj_id])
                     from django.db import transaction
                     transaction.commit_unless_managed()
-        return CMDBMapManager(orig_manager)
+        #return CMDBMapManager(orig_manager)
+        return orig_manager
             
 from django.db import models
 
@@ -55,7 +59,11 @@ class CMDBManyToManyField(models.ManyToManyField):
             if kwargs['reversed']:
                 self.reversed = True
                 del kwargs['reversed']
+        # Create a temporary view to handle SELECTs
+        self.writable_db_table = kwargs['db_table']
+        kwargs['db_table'] = 'pure_' + kwargs['db_table']
         super(CMDBManyToManyField, self).__init__(*args, **kwargs)
+        
     def _get_m2m_column_name(self, related):
         if self.reversed:
             return 'IdObj2'
@@ -66,10 +74,50 @@ class CMDBManyToManyField(models.ManyToManyField):
             return 'IdObj1'
         else:
             return 'IdObj2'
+    def _get_m2m_db_readonly_view(self, opts):
+        return 'pure_' + self._get_m2m_db_table(opts)
     def contribute_to_class(self, cls, name):
         super(CMDBManyToManyField, self).contribute_to_class(cls, name)
         desc = cls.__dict__[name]
-        setattr(cls, name, MaskingDescriptor(desc))
+        #setattr(cls, name, MaskingDescriptor(desc))
+
+        from django.db import connection
+        cursor = connection.cursor()
+        qn = connection.ops.quote_name
+        qd = {
+            'view': qn(self.db_table),
+            'realtable': qn(self.writable_db_table),
+            'col': qn(self._get_m2m_column_name(None)),
+            'rev': qn(self._get_m2m_reverse_name(None)),
+            'insertrule': qn('insertrule_' + self.writable_db_table),
+            'deleterule': qn('deleterule_' + self.writable_db_table),
+        }
+        if not self.reversed:
+            qd.update({
+                'coltable': qn(cls._meta.db_table),
+                'revtable': qn(self.model.to._meta.db_table)
+            })
+        else:
+            qd.update({
+                'revtable': qn(cls._meta.db_table),
+                'coltable': qn(self.rel.to._meta.db_table)
+            })
+        cursor.execute('CREATE TEMPORARY VIEW %s AS SELECT * FROM '
+            '%s WHERE "Status" = \'A\'' % (qn(self.db_table), qn(self.writable_db_table)))
+        insert_rule = 'CREATE RULE %(insertrule)s AS ' \
+            'ON INSERT TO %(view)s DO INSTEAD ' \
+            'INSERT INTO %(realtable)s ("IdDomain", "IdClass1", "IdClass2", ' \
+            '"Status", %(col)s, %(rev)s) VALUES (\'%(realtable)s\', \'%(coltable)s\', ' \
+            '\'%(revtable)s\', \'A\', NEW.%(col)s, NEW.%(rev)s)'
+        delete_rule = 'CREATE RULE %(deleterule)s AS ' \
+            'ON DELETE TO %(view)s DO INSTEAD ' \
+            'UPDATE %(realtable)s SET "Status" = \'N\' ' \
+            'WHERE %(col)s = OLD.%(col)s AND %(rev)s = OLD.%(rev)s'
+        z = insert_rule % qd
+        cursor.execute(z)
+        z = delete_rule % qd
+        cursor.execute(z)
+        
     def contribute_to_related_class(self, cls, related):
         super(CMDBManyToManyField, self).contribute_to_related_class(cls, related)
         try:
@@ -77,7 +125,7 @@ class CMDBManyToManyField(models.ManyToManyField):
             if name:
                 try:
                     desc = cls.__dict__[name]
-                    setattr(cls, name, MaskingDescriptor(desc))
+                    #setattr(cls, name, MaskingDescriptor(desc))
                 except KeyError:
                     pass
         except AttributeError:
