@@ -8,14 +8,14 @@ class LookupQuerySet(ClassFieldsQuerySet):
         "Returns all Lookup objects of the given type."
         return self.active().filter(type__exact=typename)
 
-    def choices(self, typename):
+    def choices(self, typename, value_field='description'):
         """
         Returns all Lookup objects of the given type, in a format
         suitable for usage as the ``choices`` keyword argument to
         a Django field.
         """
-        rows = self.type(typename).values('id', 'description')
-        return [(r['id'], r['description']) for r in rows]
+        rows = self.type(typename).values('id', value_field)
+        return [(r['id'], r[value_field]) for r in rows]
 
     def get_label(self, typename, label):
         "Returns a single Lookup object w/ the given type and label."
