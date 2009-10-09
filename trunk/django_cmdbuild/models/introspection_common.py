@@ -46,12 +46,12 @@ class QueryClassCatalog(object):
                 'lookup': r['attributelookup'],
                 #'null': r['attributenull'] == '',
                 'default_value': r['attributedefault']
-             }
-             
-             if old:
-                 self.classes[r['classname']][r['attributename']]['null'] = (
+            }
+
+            if old:
+                self.classes[r['classname']][r['attributename']]['null'] = (
                     r['attributenull'] == '' )
-             else:
+            else:
                 self.classes[r['classname']][r['attributename']]['null'] = (
                     not r['attributenotnull'])
 
