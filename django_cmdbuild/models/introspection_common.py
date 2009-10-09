@@ -5,15 +5,27 @@ class QueryClassCatalog(object):
     """
     def __init__(self):
         from django.db import connection
+        
+        # Get version info
+        from django import settings
+        try:
+            old = settings.CMDBUILD_PRE_V1
+        except AttributeError:
+            old = false
 
         # Initalize the dictionary
         self.classes = {}
 
         # Retrieve the catalog view's rows from the DB
         cursor = connection.cursor()
-        cursor.execute('SELECT classname, attributename, classcomment, attributemode, attributedescription, attributelookup, '
+        if old:
+            cursor.execute('SELECT classname, attributename, classcomment, attributemode, attributedescription, attributelookup, '
                'attributenull, attributedefault '
                'FROM cmdbclasscatalog')
+        else:
+            cursor.execute('SELECT classname, attributename, attributecomment, attributedescription, attributelookup, '
+               'attributenotnull, attributedefault '
+               'FROM system_attributecatalog')
         #print cursor.description
 
         def fetchall(cursor):
@@ -29,14 +41,27 @@ class QueryClassCatalog(object):
                 self.classes[r['classname']] = {}
 
             self.classes[r['classname']][r['attributename']] = {
-                'mode': r['classcomment'],
+                #'mode': r['classcomment'],
                 'desc': r['attributedescription'],
                 'lookup': r['attributelookup'],
-                'null': r['attributenull'] == '',
+                #'null': r['attributenull'] == '',
                 'default_value': r['attributedefault']
              }
+             
+             if old:
+                 self.classes[r['classname']][r['attributename']]['null'] = (
+                    r['attributenull'] == '' )
+             else:
+                self.classes[r['classname']][r['attributename']]['null'] = (
+                    not r['attributenotnull'])
 
-        cursor.execute('SELECT DISTINCT cmdb.classname as class1, cmdb2.classname as class2 FROM cmdbclasscatalog cmdb LEFT JOIN pg_catalog.pg_inherits cat ON cmdb.classid = cat.inhrelid LEFT JOIN cmdbclasscatalog cmdb2 ON cmdb2.classid = cat.inhparent WHERE NOT cmdb2.classname = \'\'')
+        cursor.execute('SELECT DISTINCT cmdb.classname as class1, '
+            'cmdb2.classname as class2 FROM system_classcatalog cmdb '
+            'LEFT JOIN pg_catalog.pg_inherits cat '
+            'ON cmdb.classid = cat.inhrelid '
+            'LEFT JOIN cmdbclasscatalog cmdb2 '
+            'ON cmdb2.classid = cat.inhparent '
+            'WHERE NOT cmdb2.classname = \'\'')
         rows= cursor.fetchall()
         for r in rows:
             if r[0] not in self.classes:
