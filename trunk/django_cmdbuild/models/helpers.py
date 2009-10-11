@@ -5,6 +5,12 @@ from django_cmdbuild.models.expander import ExpanderField
 from django_cmdbuild.models.querysets import *
 from django_cmdbuild.models import Lookup
 
+from django.conf import settings
+try:
+    cmdbuild_user = settings.CMDBUILD_USER
+except AttributeError:
+    cmdbuild_user = None
+
 def from_kwargs(func):
     def wrapper(*args, **kwargs):
         name, value = kwargs.items()[0]
@@ -30,6 +36,8 @@ class CMDBModelOptions(object):
         else:
             if hasattr(self, 'status'):
                 self.status = 'A'
+        if hasattr(self, 'user') and cmdbuild_user:
+            self.user = cmdbuild_user
         if self._meta.has_auto_field:
             from django.utils.encoding import smart_unicode
             pk_val = self._get_pk_val()
