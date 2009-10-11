@@ -6,13 +6,13 @@ except AttributeError:
     old_version = False
 
 if old_version:
-    catalog_query = 'SELECT classname, attributename, classcomment, '
-        'attributemode, attributedescription, attributelookup, attributenull, '
+    catalog_query = 'SELECT classname, attributename, classcomment, ' \
+        'attributemode, attributedescription, attributelookup, attributenull, ' \
         'attributedefault FROM cmdbclasscatalog'
     catalog_table_name = 'cmdbclasscatalog'
 else:
-    catalog_query ='SELECT classname, attributename, attributecomment, '
-        'attributedescription, attributelookup, attributenotnull, '
+    catalog_query ='SELECT classname, attributename, attributecomment, ' \
+        'attributedescription, attributelookup, attributenotnull, ' \
         'attributedefault FROM system_attributecatalog'
     catalog_table_name = 'system_classcatalog'
 
