@@ -1,3 +1,21 @@
+# Get version info
+from django import settings
+try:
+    old_version = settings.CMDBUILD_PRE_V1
+except AttributeError:
+    old_version = False
+
+if old_version:
+    catalog_query = 'SELECT classname, attributename, classcomment, '
+        'attributemode, attributedescription, attributelookup, attributenull, '
+        'attributedefault FROM cmdbclasscatalog'
+    catalog_table_name = 'cmdbclasscatalog'
+else:
+    catalog_query ='SELECT classname, attributename, attributecomment, '
+        'attributedescription, attributelookup, attributenotnull, '
+        'attributedefault FROM system_attributecatalog'
+    catalog_table_name = 'system_classcatalog'
+
 class QueryClassCatalog(object):
     """
     Populates a dict representing the structure of the CMDBuild
@@ -6,26 +24,12 @@ class QueryClassCatalog(object):
     def __init__(self):
         from django.db import connection
         
-        # Get version info
-        from django import settings
-        try:
-            old = settings.CMDBUILD_PRE_V1
-        except AttributeError:
-            old = false
-
         # Initalize the dictionary
         self.classes = {}
 
         # Retrieve the catalog view's rows from the DB
         cursor = connection.cursor()
-        if old:
-            cursor.execute('SELECT classname, attributename, classcomment, attributemode, attributedescription, attributelookup, '
-               'attributenull, attributedefault '
-               'FROM cmdbclasscatalog')
-        else:
-            cursor.execute('SELECT classname, attributename, attributecomment, attributedescription, attributelookup, '
-               'attributenotnull, attributedefault '
-               'FROM system_attributecatalog')
+        cursor.execute(catalog_query)
         #print cursor.description
 
         def fetchall(cursor):
@@ -48,7 +52,7 @@ class QueryClassCatalog(object):
                 'default_value': r['attributedefault']
             }
 
-            if old:
+            if old_version:
                 self.classes[r['classname']][r['attributename']]['null'] = (
                     r['attributenull'] == '' )
             else:
@@ -56,10 +60,10 @@ class QueryClassCatalog(object):
                     not r['attributenotnull'])
 
         cursor.execute('SELECT DISTINCT cmdb.classname as class1, '
-            'cmdb2.classname as class2 FROM system_classcatalog cmdb '
+            'cmdb2.classname as class2 FROM ' + catalog_table_name + ' cmdb '
             'LEFT JOIN pg_catalog.pg_inherits cat '
             'ON cmdb.classid = cat.inhrelid '
-            'LEFT JOIN cmdbclasscatalog cmdb2 '
+            'LEFT JOIN ' + catalog_table_name + ' cmdb2 '
             'ON cmdb2.classid = cat.inhparent '
             'WHERE NOT cmdb2.classname = \'\'')
         rows= cursor.fetchall()
