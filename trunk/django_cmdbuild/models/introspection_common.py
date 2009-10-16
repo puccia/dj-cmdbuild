@@ -1,5 +1,5 @@
 # Get version info
-from django import settings
+from django.conf import settings
 try:
     old_version = settings.CMDBUILD_PRE_V1
 except AttributeError:
