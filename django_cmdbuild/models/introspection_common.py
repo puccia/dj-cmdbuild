@@ -12,7 +12,7 @@ if old_version:
     catalog_table_name = 'cmdbclasscatalog'
 else:
     catalog_query ='SELECT classname, attributename, attributecomment, ' \
-        'attributedescription, attributelookup, attributenotnull, ' \
+        'attributelookup, attributenotnull, ' \
         'attributedefault FROM system_attributecatalog'
     catalog_table_name = 'system_classcatalog'
 
@@ -44,14 +44,17 @@ class QueryClassCatalog(object):
             if not r['classname'] in self.classes:
                 self.classes[r['classname']] = {}
 
-            self.classes[r['classname']][r['attributename']] = {
-                #'mode': r['classcomment'],
-                'desc': r['attributedescription'],
-                'lookup': r['attributelookup'],
-                #'null': r['attributenull'] == '',
-                'default_value': r['attributedefault']
-            }
+            # Enter all attributes that we could fetch from the system catalogs
+            self.classes[r['classname']][r['attributename']] = {}
+            for k, v in (('mode', 'classcomment'), ('desc', 'attributedescription'),
+                ('lookup', 'attributelookup'), ('null', 'attributenull'),
+                ('default_value', 'attributedefault')):
+                try:
+                    self.classes[r['classname']][r['attributename']][k] = r[v]
+                except KeyError:
+                    pass
 
+            # The logic was inverted in CMDBuild 1.0; respect that
             if old_version:
                 self.classes[r['classname']][r['attributename']]['null'] = (
                     r['attributenull'] == '' )
