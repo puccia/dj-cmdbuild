@@ -384,9 +384,13 @@ class Command(NoArgsCommand):
                     
                     if cat_entry:
                         # Add help text.
-                        if cat_entry['desc']:
-                            f.add_kw_param('help_text', cat_entry['desc'])
-                            #extra_params['help_text'] = '%r' % cat_entry['desc']
+                        # This was dropped in v1.0 of CMDBuild; don't complain if there isn't.
+                        try:
+                            if cat_entry['desc']:
+                                f.add_kw_param('help_text', cat_entry['desc'])
+                                #extra_params['help_text'] = '%r' % cat_entry['desc']
+                        except KeyError:
+                            pass
                         if ( len(cat_entry['lookup']) > 0 
                             and (not table_name == 'Lookup')):
                             #extra_params['choices'] = 'Lookup.objects.choices(%r)' % cat_entry['lookup']
