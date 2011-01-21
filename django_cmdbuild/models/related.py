@@ -51,25 +51,36 @@ class MaskingDescriptor(object):
                         invert = True
                     else:
                         raise Exception, 'Invalid column name: %s' % source_col_name
-                    cursor.execute ("""
-                    SELECT '"%(realtable)s"'::regclass::integer,
-                        '"%(coltable)s"'::regclass::integer,
-                        '"%(revtable)s"'::regclass::integer
-                    """ % self_desc.querydict)
-                    relation_oid, col_oid, rev_oid = cursor.fetchall()[0]
-                    idclass1_oid, idclass2_oid = col_oid, rev_oid
-                    
-                    sql = """SELECT createrelation('%(domainid)s', '%(idclass1)s',
-                        '%(idobj1)s', '%(idclass2)s', '%(idobj2)s', 'A', 'dj-cmdbuild',
-                        '%(realtable)s')
-                    """ % {
-                        'domainid': relation_oid,
-                        'idclass1': idclass1_oid,
-                        'idobj1': '%s',
-                        'idclass2': idclass2_oid,
-                        'idobj2': '%s',
-                        'realtable': self_desc.querydict['realtable'],
-                    }
+
+                    if old_version:
+                        cursor.execute ("""
+                        SELECT '"%(realtable)s"'::regclass::integer,
+                            '"%(coltable)s"'::regclass::integer,
+                            '"%(revtable)s"'::regclass::integer
+                        """ % self_desc.querydict)
+                        relation_oid, col_oid, rev_oid = cursor.fetchall()[0]
+
+                        idclass1_oid, idclass2_oid = col_oid, rev_oid
+
+                        sql = """SELECT createrelation('%(domainid)s', '%(idclass1)s',
+                            '%(idobj1)s', '%(idclass2)s', '%(idobj2)s', 'A', 'dj-cmdbuild',
+                            '%(realtable)s')
+                        """ % {
+                                'domainid': relation_oid,
+                                'idclass1': idclass1_oid,
+                                'idobj1': '%s',
+                                'idclass2': idclass2_oid,
+                                'idobj2': '%s',
+                                'realtable': self_desc.querydict['realtable'],
+                            }
+                    else:
+                        sql = """INSERT INTO "%(realtable)s" (
+                           "IdDomain", "IdClass1", "IdObj1", "IdClass2", "IdObj2", "Status", "User"
+                        ) VALUES (
+                           '"%(realtable)s"'::regclass, '"%(coltable)s"'::regclass, %%s,
+                            '"%(revtable)s"'::regclass, %%s, 'A', 'dj-cmdbuild'
+                        ) """ % self_desc.querydict
+
                     if not invert:
                         for obj_id in (new_ids - existing_ids):
                             cursor.execute(sql,
