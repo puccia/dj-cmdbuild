@@ -155,7 +155,8 @@ class CMDBManyToManyField(models.ManyToManyField):
         delete_rule = 'CREATE OR REPLACE RULE "%(deleterule)s" AS ' \
             'ON DELETE TO "%(view)s" DO INSTEAD ' \
             'UPDATE "%(realtable)s" SET "Status" = \'N\' ' \
-            'WHERE "%(col)s" = OLD."%(col)s" AND "%(rev)s" = OLD."%(rev)s"'
+            'WHERE "%(col)s" = OLD."%(col)s" AND "%(rev)s" = OLD."%(rev)s" ' \
+            'AND "Status" = \'A\''
         cursor.execute(delete_rule % self.querydict)
         
     def contribute_to_related_class(self, cls, related):
