@@ -18,7 +18,7 @@ class MaskingDescriptor(object):
             def __init__(self, orig):
                 for k, v in orig.__dict__.items():
                     self.__dict__[k] = v
-            #def _add_items(self, source_col_name, target_col_name, *objs):
+
             def _add_items(self, source_col_name, target_col_name, *objs):
                 # join_table: name of the m2m link table
                 # source_col_name: the PK colname in join_table for the source object
