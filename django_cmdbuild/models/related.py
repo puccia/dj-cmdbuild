@@ -1,5 +1,12 @@
 from django.utils.functional import curry
 
+# Get version info
+from django.conf import settings
+try:
+    old_version = settings.CMDBUILD_PRE_V1
+except AttributeError:
+    old_version = False
+
 class MaskingDescriptor(object):
     def __init__(self, orig_desc, querydict):
         self.orig_desc = orig_desc
